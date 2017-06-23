@@ -1,8 +1,8 @@
-nautilus-500px-uploader (0.3.0-0extras16.04.4) xenial; urgency=medium
+nautilus-500px-uploader (0.3.0-0extras16.04.6) xenial; urgency=medium
 
   * Fixed a bug
 
- -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Sun, 18 Dec 2016 22:07:51 +0100
+ -- Lorenzo Carbonell <lorenzo.carbonell.cerezo@gmail.com>  Fri, 23 Jun 2017 19:41:25 +0200
 
 nautilus-500px-uploader (0.3.0-0extras16.04.1) xenial; urgency=medium
 

@@ -31,10 +31,6 @@ except Exception as e:
     print(e)
     exit(-1)
 import os
-import subprocess
-import shlex
-import tempfile
-import shutil
 from threading import Thread
 from urllib import unquote_plus
 from gi.repository import GObject
@@ -693,6 +689,7 @@ class S00px():
         except Exception as e:
             print(e)
         return None
+
 
 if __name__ == '__main__':
     '''
