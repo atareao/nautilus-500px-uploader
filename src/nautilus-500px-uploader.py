@@ -1,42 +1,47 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# This file is part of nautilus-500px-uploader
+# This file is part of nanecalib 
 #
-# Copyright (C) 2016 Lorenzo Carbonell
-# lorenzo.carbonell.cerezo@gmail.com
+# Copyright (c) 2020 Lorenzo Carbonell Cerezo <a.k.a. atareao>
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#
-#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 import gi
 try:
     gi.require_version('Gtk', '3.0')
+    gi.require_version('Gdk', '3.0')
     gi.require_version('GdkPixbuf', '2.0')
     gi.require_version('Nautilus', '3.0')
-    gi.require_version('WebKit', '3.0')
+    gi.require_version('WebKit2', '4.0')
 except Exception as e:
     print(e)
-    exit(-1)
+    exit(1)
 import os
 from threading import Thread
-from urllib import unquote_plus
+from urllib.parse import unquote_plus
 from gi.repository import GObject
-from gi.repository import WebKit
+from gi.repository import WebKit2
 from gi.repository import GdkPixbuf
 from gi.repository import Gtk
+from gi.repository import Gdk
 from gi.repository import GLib
 from gi.repository import Nautilus as FileManager
 
@@ -139,13 +144,13 @@ class LoginDialog(Gtk.Dialog):
     def __init__(self, url, parent):
         self.code = None
 
-        Gtk.Dialog.__init__(self, _('Login'), parent,
-                            Gtk.DialogFlags.MODAL |
-                            Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                            (Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT,
-                             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
-        self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
-        self.set_title(APP)
+        Gtk.Dialog.__init__(self, _('Login'), parent)
+        self.set_modal(True)
+        self.set_destroy_with_parent(True)
+        self.set_resizable(False)
+        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
+        self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.connect('realize', self.on_realize)
         #
         vbox = Gtk.VBox(spacing=5)
         self.get_content_area().add(vbox)
@@ -166,6 +171,19 @@ class LoginDialog(Gtk.Dialog):
         #
         self.show_all()
 
+    def on_realize(self, *_):
+        display = Gdk.Display.get_default()
+        seat = display.get_default_seat()
+        pointer = seat.get_pointer()
+        screen, x, y = pointer.get_position()
+        monitor = display.get_monitor_at_point(x, y)
+        scale = monitor.get_scale_factor()
+        monitor_width = monitor.get_geometry().width / scale
+        monitor_height = monitor.get_geometry().height / scale
+        width = self.get_preferred_width()[0]
+        height = self.get_preferred_height()[0]
+        self.move((monitor_width - width)/2, (monitor_height - height)/2)
+
     # ###################################################################
     # ########################BROWSER####################################
     # ###################################################################
@@ -183,8 +201,6 @@ class LoginDialog(Gtk.Dialog):
             print(e)
             print('Error')
 
-# class twitterDialog(Gtk.Dialog):
-
 
 class IdleObject(GObject.GObject):
     """
@@ -200,10 +216,10 @@ class IdleObject(GObject.GObject):
 
 class DoItInBackground(IdleObject, Thread):
     __gsignals__ = {
-        'started': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (int,)),
-        'ended': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (bool,)),
-        'start_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (str,)),
-        'end_one': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, (float,)),
+        'started': (GObject.SignalFlags.RUN_FIRST, GObject.TYPE_NONE, (int,)),
+        'ended': (GObject.SignalFlags.RUN_FIRST, GObject.TYPE_NONE, (bool,)),
+        'start_one': (GObject.SignalFlags.RUN_FIRST, GObject.TYPE_NONE, (str,)),
+        'end_one': (GObject.SignalFlags.RUN_FIRST, GObject.TYPE_NONE, (float,)),
     }
 
     def __init__(self, s00, files, name, description, category):
@@ -243,25 +259,25 @@ class DoItInBackground(IdleObject, Thread):
                 self.emit('start_one', element)
                 self.send_file(element)
                 self.emit('end_one', get_duration(element))
-        except Exception as e:
+        except Exception:
             self.ok = False
         self.emit('ended', self.ok)
 
 
 class Progreso(Gtk.Dialog, IdleObject):
     __gsignals__ = {
-        'i-want-stop': (GObject.SIGNAL_RUN_FIRST, GObject.TYPE_NONE, ()),
+        'i-want-stop': (GObject.SignalFlags.RUN_FIRST, GObject.TYPE_NONE, ()),
     }
 
     def __init__(self, title, parent, max_value):
-        Gtk.Dialog.__init__(self, title, parent,
-                            Gtk.DialogFlags.MODAL |
-                            Gtk.DialogFlags.DESTROY_WITH_PARENT)
+        Gtk.Dialog.__init__(self, title, parent)
         IdleObject.__init__(self)
-        self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
-        self.set_size_request(330, 30)
+        self.set_modal(True)
+        self.set_destroy_with_parent(True)
         self.set_resizable(False)
         self.connect('destroy', self.close)
+        self.connect('realize', self.on_realize)
+        self.set_size_request(330, 30)
         self.set_modal(True)
         vbox = Gtk.VBox(spacing=5)
         vbox.set_border_width(5)
@@ -272,7 +288,7 @@ class Progreso(Gtk.Dialog, IdleObject):
         table = Gtk.Table(2, 2, False)
         frame1.add(table)
         #
-        self.label = Gtk.Label()
+        self.label = Gtk.Label.new()
         table.attach(self.label, 0, 2, 0, 1,
                      xpadding=5,
                      ypadding=5,
@@ -323,19 +339,31 @@ class Progreso(Gtk.Dialog, IdleObject):
     def set_element(self, anobject, element):
         self.label.set_text(_('Sending: %s') % element)
 
+    def on_realize(self, *_):
+        display = Gdk.Display.get_default()
+        seat = display.get_default_seat()
+        pointer = seat.get_pointer()
+        screen, x, y = pointer.get_position()
+        monitor = display.get_monitor_at_point(x, y)
+        scale = monitor.get_scale_factor()
+        monitor_width = monitor.get_geometry().width / scale
+        monitor_height = monitor.get_geometry().height / scale
+        width = self.get_preferred_width()[0]
+        height = self.get_preferred_height()[0]
+        self.move((monitor_width - width)/2, (monitor_height - height)/2)
+
 
 class S00pxDialog(Gtk.Dialog):
 
     def __init__(self, parent=None, fileimage=None):
-        Gtk.Dialog.__init__(self,
-                            _('Send images to 500px'),
-                            parent,
-                            Gtk.DialogFlags.MODAL |
-                            Gtk.DialogFlags.DESTROY_WITH_PARENT,
-                            (Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT,
-                             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
+        Gtk.Dialog.__init__(self, _('Send images to 500px'), parent)
+        self.set_modal(True)
+        self.set_destroy_with_parent(True)
+        self.set_resizable(False)
+        self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.ACCEPT)
+        self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        self.connect('realize', self.on_realize)
         self.set_icon_name(APP)
-        self.set_position(Gtk.WindowPosition.CENTER_ALWAYS)
         frame = Gtk.Frame()
         frame.set_border_width(5)
         grid = Gtk.Grid()
@@ -345,19 +373,19 @@ class S00pxDialog(Gtk.Dialog):
         frame.add(grid)
         self.get_content_area().add(frame)
 
-        label = Gtk.Label(_('Name')+' :')
+        label = Gtk.Label.new(_('Name')+' :')
         label.set_xalign(0)
         grid.attach(label, 0, 0, 1, 1)
         self.entry_name = Gtk.Entry()
         grid.attach(self.entry_name, 1, 0, 1, 1)
 
-        label = Gtk.Label(_('Description')+' :')
+        label = Gtk.Label.new(_('Description')+' :')
         label.set_xalign(0)
         grid.attach(label, 0, 1, 1, 1)
         self.entry_description = Gtk.Entry()
         grid.attach(self.entry_description, 1, 1, 1, 1)
 
-        label = Gtk.Label(_('Category')+' :')
+        label = Gtk.Label.new(_('Category')+' :')
         label.set_xalign(0)
         grid.attach(label, 0, 2, 1, 1)
         listmodel = Gtk.ListStore(str, int)
@@ -370,10 +398,10 @@ class S00pxDialog(Gtk.Dialog):
         self.combobox.set_active(0)
         grid.attach(self.combobox, 1, 2, 1, 1)
 
-        label = Gtk.Label(_('Image')+' :')
+        label = Gtk.Label.new(_('Image')+' :')
         label.set_xalign(0)
         grid.attach(label, 0, 3, 1, 1)
-        button = Gtk.Button(_('Load image'))
+        button = Gtk.Button.new_with_label(_('Load image'))
         button.connect('clicked', self.on_button_clicked)
         grid.attach(button, 1, 3, 1, 1)
         self.scrolledwindow1 = Gtk.ScrolledWindow()
@@ -457,6 +485,19 @@ class S00pxDialog(Gtk.Dialog):
                 w/z, h/z,  GdkPixbuf.InterpType.BILINEAR)
         print(zw, zh)
         self.tweet_image.set_from_pixbuf(pixbuf)
+
+    def on_realize(self, *_):
+        display = Gdk.Display.get_default()
+        seat = display.get_default_seat()
+        pointer = seat.get_pointer()
+        screen, x, y = pointer.get_position()
+        monitor = display.get_monitor_at_point(x, y)
+        scale = monitor.get_scale_factor()
+        monitor_width = monitor.get_geometry().width / scale
+        monitor_height = monitor.get_geometry().height / scale
+        width = self.get_preferred_width()[0]
+        height = self.get_preferred_height()[0]
+        self.move((monitor_width - width)/2, (monitor_height - height)/2)
 
 
 def get_duration(file_in):
@@ -700,7 +741,7 @@ if __name__ == '__main__':
     '''
     window = None
     files = []
-    afile = '/home/lorenzo/Escritorio/ejemplo.jpg'
+    afile = '/home/lorenzo/Descargas/ejemplo.jpg'
     files.append(afile)
     s00pxd = S00pxDialog(window, files[0])
     if s00pxd.run() == Gtk.ResponseType.ACCEPT:
